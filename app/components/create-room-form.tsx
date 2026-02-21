@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import type { PrizeConfig } from "@/types"
 
@@ -19,9 +19,20 @@ export function CreateRoomForm({
   ])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [focusNewTier, setFocusNewTier] = useState(false)
+  const newTierRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (focusNewTier && newTierRef.current) {
+      newTierRef.current.focus()
+      newTierRef.current.select()
+      setFocusNewTier(false)
+    }
+  }, [focusNewTier])
 
   function addTier() {
     setPrizes([...prizes, { amount: 10000, count: 1 }])
+    setFocusNewTier(true)
   }
 
   function removeTier(index: number) {
@@ -77,7 +88,7 @@ export function CreateRoomForm({
           onChange={(e) => setMaxPlayers(Number(e.target.value))}
           className="w-full px-4 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900"
         >
-          {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+          {Array.from({ length: 24 }, (_, i) => i + 2).map((n) => (
             <option key={n} value={n}>
               {n} players
             </option>
@@ -94,6 +105,7 @@ export function CreateRoomForm({
             <div key={i} className="flex items-start gap-2">
               <div className="flex-1 min-w-0">
                 <input
+                  ref={i === prizes.length - 1 ? newTierRef : undefined}
                   type="number"
                   value={prize.amount || ""}
                   onChange={(e) => updateTier(i, "amount", Number(e.target.value))}

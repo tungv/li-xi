@@ -38,6 +38,10 @@ const schema = {
     statusChanged: z.object({
       status: z.string(),
     }),
+    countdownStarted: z.object({
+      countdown: z.number(),
+    }),
+    countdownCancelled: z.object({}),
   },
   envelope: {
     picked: z.object({

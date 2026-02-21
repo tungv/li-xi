@@ -155,6 +155,32 @@ export async function startGame(roomId: string, creatorId: string): Promise<void
   })
 }
 
+// ─── Reveal Countdown (broadcast to all clients) ──────────────
+
+export async function startCountdown(
+  roomId: string,
+  playerId: string,
+  countdown: number
+): Promise<void> {
+  const room = await getRoom(roomId)
+  if (!room) throw new Error("Room not found")
+  if (room.creatorId !== playerId) throw new Error("Only the host can start the countdown")
+  if (room.status !== "trading") throw new Error("Not in trading phase")
+
+  await realtime.channel(`room-${roomId}`).emit("game.countdownStarted", { countdown })
+}
+
+export async function cancelCountdown(
+  roomId: string,
+  playerId: string
+): Promise<void> {
+  const room = await getRoom(roomId)
+  if (!room) throw new Error("Room not found")
+  if (room.creatorId !== playerId) throw new Error("Only the host can cancel the countdown")
+
+  await realtime.channel(`room-${roomId}`).emit("game.countdownCancelled", {})
+}
+
 // ─── Pick Envelope ─────────────────────────────────────────────
 
 export async function pickEnvelope(

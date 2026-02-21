@@ -290,6 +290,8 @@ export function GameBoard({
       "game.started",
       "game.statusChanged",
       "game.revealed",
+      "game.countdownStarted",
+      "game.countdownCancelled",
       "envelope.picked",
       "trade.offered",
       "trade.responded",
@@ -353,6 +355,7 @@ export function GameBoard({
         case "game.statusChanged": {
           const d = data as { status: string }
           setRoom((prev) => ({ ...prev, status: d.status as RoomStatus }))
+          setCountdown(null)
           if (d.status === "waiting") {
             setEnvelopes([])
             setTrades([])
@@ -472,6 +475,7 @@ export function GameBoard({
               pickedBy: string
             }>
           }
+          setCountdown(null)
           setRoom((prev) => ({ ...prev, status: "revealed" as RoomStatus }))
           setEnvelopes((prev) =>
             prev.map((e) => {
@@ -480,6 +484,17 @@ export function GameBoard({
               return { ...e, amount: revealed.amount, pickedBy: revealed.pickedBy }
             })
           )
+          break
+        }
+
+        case "game.countdownStarted": {
+          const d = data as { countdown: number }
+          setCountdown(d.countdown)
+          break
+        }
+
+        case "game.countdownCancelled": {
+          setCountdown(null)
           break
         }
       }
@@ -505,26 +520,45 @@ export function GameBoard({
     removePlayerState.error ??
     renamePlayerState.error
 
-  // ── Reveal countdown ────────────────────────────────────────
-  // When the host clicks Reveal, start a 3-2-1 countdown before actually revealing.
+  // ── Reveal countdown (synced across all devices via realtime) ──
+  // All clients tick down locally. Only the host dispatches the actual reveal at 0.
   useEffect(() => {
     if (countdown === null || countdown < 0) return
     if (countdown === 0) {
-      startTransition(() => dispatchReveal())
+      if (isCreator) {
+        startTransition(() => dispatchReveal())
+      }
       setCountdown(null)
       return
     }
     const timer = setTimeout(() => setCountdown((c) => (c !== null ? c - 1 : null)), 1000)
     return () => clearTimeout(timer)
-  }, [countdown, dispatchReveal, startTransition])
+  }, [countdown, isCreator, dispatchReveal, startTransition])
 
-  const startRevealCountdown = useCallback(() => {
-    setCountdown(3)
-  }, [])
+  const startRevealCountdown = useCallback(async () => {
+    try {
+      await fetch(`/api/room/${roomId}/countdown`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId, action: "start", countdown: 3 }),
+      })
+    } catch {
+      // Fallback: start locally if broadcast fails
+      setCountdown(3)
+    }
+  }, [roomId, playerId])
 
-  const cancelCountdown = useCallback(() => {
-    setCountdown(null)
-  }, [])
+  const cancelCountdownAction = useCallback(async () => {
+    try {
+      await fetch(`/api/room/${roomId}/countdown`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId, action: "cancel" }),
+      })
+    } catch {
+      setCountdown(null)
+    }
+  }, [roomId, playerId])
 
   const handleChangeName = useCallback(
     async (newName: string) => {
@@ -710,12 +744,14 @@ export function GameBoard({
                   {countdown}
                 </div>
                 <p className="text-white/80 text-lg font-medium">Revealing envelopes...</p>
-                <button
-                  onClick={cancelCountdown}
-                  className="px-4 py-2 text-sm text-white/70 hover:text-white border border-white/30 rounded-lg hover:bg-white/10 transition-colors"
-                >
-                  Cancel
-                </button>
+                {isCreator && (
+                  <button
+                    onClick={cancelCountdownAction}
+                    className="px-4 py-2 text-sm text-white/70 hover:text-white border border-white/30 rounded-lg hover:bg-white/10 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
               </div>
             </div>
           )}

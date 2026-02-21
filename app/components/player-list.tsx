@@ -31,6 +31,7 @@ export function PlayerList({
   const [, startTransition] = useTransition()
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameInput, setRenameInput] = useState("")
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
 
   const amCreator = currentPlayerId === creatorId
   const canManagePlayers = amCreator && roomStatus === "waiting"
@@ -140,13 +141,33 @@ export function PlayerList({
                     >
                       Rename
                     </button>
-                    <button
-                      onClick={() => startTransition(() => onRemovePlayer?.(player.id))}
-                      className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
-                      title="Remove from room"
-                    >
-                      Remove
-                    </button>
+                    {confirmRemoveId === player.id ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            startTransition(() => onRemovePlayer?.(player.id))
+                            setConfirmRemoveId(null)
+                          }}
+                          className="text-xs px-2 py-0.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors font-medium"
+                        >
+                          Sure?
+                        </button>
+                        <button
+                          onClick={() => setConfirmRemoveId(null)}
+                          className="text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded hover:bg-gray-300 transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmRemoveId(player.id)}
+                        className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                        title="Remove from room"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </>
                 )}
               </div>
