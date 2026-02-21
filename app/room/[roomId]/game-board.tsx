@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useOptimistic, useActionState, useTransition } from "react"
+import { useState, useOptimistic, useActionState, useTransition, useEffect, useCallback } from "react"
 import { useRealtime } from "@/lib/realtime-client"
 import type { GameState, Player, Envelope, Trade, RoomStatus } from "@/types"
 import { envelopeCode } from "@/lib/envelopes"
@@ -9,6 +9,7 @@ import { EnvelopeGrid } from "@/app/components/envelope-grid"
 import { PlayerList } from "@/app/components/player-list"
 import { TradePanel } from "@/app/components/trade-panel"
 import { Leaderboard } from "@/app/components/leaderboard"
+import { AvatarMenu } from "@/app/components/avatar-menu"
 
 // ── Phase Indicator (dot stepper) ──────────────────────────────
 const PHASES = ["waiting", "picking", "trading", "revealed"] as const
@@ -104,6 +105,8 @@ export function GameBoard({
   const [envelopes, setEnvelopes] = useState<Envelope[]>(initialState.envelopes)
   const [trades, setTrades] = useState<Trade[]>(initialState.trades)
   const [kicked, setKicked] = useState(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [displayName, setDisplayName] = useState(playerName)
   const [, startTransition] = useTransition()
 
   // ── Optimistic envelope state during the pick transition ──────
@@ -131,7 +134,7 @@ export function GameBoard({
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, playerName, ...body }),
+      body: JSON.stringify({ playerId, playerName: displayName, ...body }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error)
@@ -502,6 +505,45 @@ export function GameBoard({
     removePlayerState.error ??
     renamePlayerState.error
 
+  // ── Reveal countdown ────────────────────────────────────────
+  // When the host clicks Reveal, start a 3-2-1 countdown before actually revealing.
+  useEffect(() => {
+    if (countdown === null || countdown < 0) return
+    if (countdown === 0) {
+      startTransition(() => dispatchReveal())
+      setCountdown(null)
+      return
+    }
+    const timer = setTimeout(() => setCountdown((c) => (c !== null ? c - 1 : null)), 1000)
+    return () => clearTimeout(timer)
+  }, [countdown, dispatchReveal, startTransition])
+
+  const startRevealCountdown = useCallback(() => {
+    setCountdown(3)
+  }, [])
+
+  const cancelCountdown = useCallback(() => {
+    setCountdown(null)
+  }, [])
+
+  const handleChangeName = useCallback(
+    async (newName: string) => {
+      localStorage.setItem("playerName", newName)
+      setDisplayName(newName)
+      // Update on the server too (re-join with new name)
+      try {
+        await fetch(`/api/room/${roomId}/join`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId, playerName: newName }),
+        })
+      } catch {
+        // Best-effort server update
+      }
+    },
+    [roomId, playerId]
+  )
+
   if (kicked) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
@@ -522,6 +564,8 @@ export function GameBoard({
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+      <AvatarMenu playerName={displayName} onChangeName={handleChangeName} />
+
       {/* Room header */}
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-red-900">🧧 Lì Xì</h1>
@@ -532,14 +576,24 @@ export function GameBoard({
           </p>
         )}
         <PhaseIndicator status={room.status} />
-        {isCreator && room.status !== "waiting" && (
-          <button
-            onClick={() => startTransition(() => dispatchReset())}
-            disabled={isResetPending}
-            className="mt-1 px-4 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:text-red-700 disabled:opacity-50 transition-colors"
-          >
-            {isResetPending ? "Resetting..." : "Reset to Lobby"}
-          </button>
+        {room.status !== "waiting" && (
+          <div className="flex items-center justify-center gap-2">
+            {isCreator && (
+              <button
+                onClick={() => startTransition(() => dispatchReset())}
+                disabled={isResetPending}
+                className="px-4 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:text-red-700 disabled:opacity-50 transition-colors"
+              >
+                {isResetPending ? "Resetting..." : "Reset to Lobby"}
+              </button>
+            )}
+            <a
+              href="/"
+              className="px-4 py-1.5 text-xs font-medium text-red-400 hover:text-red-600 underline transition-colors"
+            >
+              Create New Lobby
+            </a>
+          </div>
         )}
       </div>
 
@@ -648,11 +702,28 @@ export function GameBoard({
             onRespond={isRespondTradePending ? () => {} : handleRespondTrade}
             onCancel={isCancelTradePending ? () => {} : dispatchCancelTrade}
           />
+          {/* Countdown overlay */}
+          {countdown !== null && countdown > 0 && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+              <div className="text-center space-y-4">
+                <div className="text-9xl font-black text-white animate-bounce drop-shadow-lg">
+                  {countdown}
+                </div>
+                <p className="text-white/80 text-lg font-medium">Revealing envelopes...</p>
+                <button
+                  onClick={cancelCountdown}
+                  className="px-4 py-2 text-sm text-white/70 hover:text-white border border-white/30 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           {isCreator && (
             <div className="text-center pt-2">
               <button
-                onClick={() => startTransition(() => dispatchReveal())}
-                disabled={isRevealPending}
+                onClick={startRevealCountdown}
+                disabled={isRevealPending || countdown !== null}
                 className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold text-lg rounded-xl hover:from-yellow-600 hover:to-yellow-700 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
               >
                 {isRevealPending ? "Revealing..." : "Reveal All Envelopes! 🎊"}

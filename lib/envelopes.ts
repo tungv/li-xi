@@ -6,8 +6,14 @@ export function envelopeCode(index: number): string {
 }
 
 export const DECORATIONS = [
-  "🧧", // Red Envelope
+  "🐴", // Horse
+  "🎠", // Carousel Horse
+  "🏇", // Horse Racing
+  "🐎", // Racehorse
+  "🫏", // Donkey (horse family)
+  "🦄", // Unicorn
   "🐲", // Dragon
+  "🧧", // Red Envelope
   "🏮", // Red Lantern
   "🎆", // Fireworks
   "🎋", // Tanabata Tree
@@ -18,13 +24,10 @@ export const DECORATIONS = [
   "🪭", // Folding Fan
   "🍊", // Tangerine (luck)
   "💮", // White Flower
-  "🎎", // Japanese Dolls
   "🐉", // Dragon Face
   "🌸", // Cherry Blossom
   "🎐", // Wind Chime
   "🦁", // Lion (lion dance)
-  "🐯", // Tiger
-  "🐰", // Rabbit
   "🪷", // Lotus
 ]
 

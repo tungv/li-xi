@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { NameForm } from "./components/name-form"
 import { CreateRoomForm } from "./components/create-room-form"
+import { AvatarMenu } from "./components/avatar-menu"
 
 export default function HomePage() {
   const [playerId, setPlayerId] = useState<string | null>(null)
@@ -22,15 +23,16 @@ export default function HomePage() {
     setPlayerName(newPlayerName)
   }
 
-  function handleChangeName() {
-    localStorage.removeItem("playerId")
-    localStorage.removeItem("playerName")
-    setPlayerId(null)
-    setPlayerName(null)
+  function handleChangeName(newName: string) {
+    localStorage.setItem("playerName", newName)
+    setPlayerName(newName)
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
+      {playerId && playerName && (
+        <AvatarMenu playerName={playerName} onChangeName={handleChangeName} />
+      )}
       <div className="bg-white/80 backdrop-blur rounded-2xl shadow-xl p-8 max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">
@@ -54,12 +56,6 @@ export default function HomePage() {
               <p className="text-red-700">
                 Welcome, <span className="font-bold">{playerName}</span>!
               </p>
-              <button
-                onClick={handleChangeName}
-                className="text-xs text-red-400 hover:text-red-600 underline mt-1"
-              >
-                Change name
-              </button>
             </div>
 
             {/* Create room */}
@@ -74,7 +70,7 @@ export default function HomePage() {
 
         {/* Footer */}
         <div className="text-center text-xs text-red-300 pt-4 border-t border-red-100">
-          🧧 🐲 🏮 🎆 🎋 🎊 🐍 🎇 🧨 🪭 🍊 💮 🎎 🐉 🌸 🎐 🦁 🐯 🐰 🪷
+          🐴 🎠 🏇 🐎 🫏 🦄 🐲 🧧 🏮 🎆 🎋 🎊 🐍 🎇 🧨 🪭 🍊 💮 🐉 🌸 🎐 🦁 🪷
         </div>
       </div>
     </div>

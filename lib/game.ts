@@ -67,9 +67,22 @@ export async function joinRoom(
   const room = await getRoom(roomId)
   if (!room) throw new Error("Room not found")
 
-  // Check if already in room
+  // Check if already in room — update name if changed
   const isMember = await redis.sismember(`room:${roomId}:players`, playerId)
-  if (isMember) return // silently succeed
+  if (isMember) {
+    const existing = await redis.hget(`room:${roomId}:player:${playerId}`, "name")
+    if (existing !== playerName) {
+      await redis.hset(`room:${roomId}:player:${playerId}`, { name: playerName })
+      if (room.creatorId === playerId) {
+        await redis.hset(`room:${roomId}`, { creatorName: playerName })
+      }
+      await realtime.channel(`room-${roomId}`).emit("player.renamed", {
+        playerId,
+        newName: playerName,
+      })
+    }
+    return
+  }
 
   if (room.status !== "waiting") throw new Error("Game already started")
 
