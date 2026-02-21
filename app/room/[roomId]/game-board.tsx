@@ -152,6 +152,14 @@ export function GameBoard({
         case "game.statusChanged": {
           const d = data as { status: string }
           setRoom((prev) => ({ ...prev, status: d.status as RoomStatus }))
+          // If reset to waiting, clear envelopes, trades, and player picks
+          if (d.status === "waiting") {
+            setEnvelopes([])
+            setTrades([])
+            setPlayers((prev) =>
+              prev.map((p) => ({ ...p, envelopeIndex: -1 }))
+            )
+          }
           break
         }
 
@@ -317,6 +325,10 @@ export function GameBoard({
     await apiCall(`/api/room/${roomId}/reveal`, {})
   }
 
+  async function handleReset() {
+    await apiCall(`/api/room/${roomId}/reset`, {})
+  }
+
   const currentPlayer = players.find((p) => p.id === playerId)
   const hasPicked = currentPlayer ? currentPlayer.envelopeIndex !== -1 : false
   const isCreator = room.creatorId === playerId
@@ -328,6 +340,15 @@ export function GameBoard({
         <h1 className="text-3xl font-bold text-red-900">🧧 Lì Xì</h1>
         <p className="text-xs text-red-400 font-mono">Room {roomId}</p>
         <PhaseIndicator status={room.status} />
+        {isCreator && room.status !== "waiting" && (
+          <button
+            onClick={handleReset}
+            disabled={loading}
+            className="text-xs text-gray-400 hover:text-red-500 underline disabled:opacity-50"
+          >
+            Reset game
+          </button>
+        )}
       </div>
 
       {/* Error banner (dismissible) */}

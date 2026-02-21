@@ -147,7 +147,17 @@ export async function pickEnvelope(
   // Check player hasn't already picked
   const playerData = await redis.hgetall(`room:${roomId}:player:${playerId}`)
   if (!playerData) throw new Error("Player not in room")
-  if (playerData.envelopeIndex !== "-1") throw new Error("You already picked an envelope")
+  if (playerData.envelopeIndex !== "-1") {
+    // Check if this is stale state from the old buggy HSETNX code:
+    // player has envelopeIndex set but the envelope doesn't have them as pickedBy
+    const oldIdx = playerData.envelopeIndex as string
+    const oldEnv = await redis.hgetall(`room:${roomId}:envelope:${oldIdx}`)
+    if (oldEnv && oldEnv.pickedBy === playerId) {
+      throw new Error("You already picked an envelope")
+    }
+    // Stale state: reset the player's pick so they can try again
+    await redis.hset(`room:${roomId}:player:${playerId}`, { envelopeIndex: "-1" })
+  }
 
   // Atomically claim the envelope: check status=available AND set to picked in one Lua script
   // This prevents two players from picking the same envelope simultaneously
@@ -342,6 +352,40 @@ export async function revealEnvelopes(
 
   await realtime.channel(`room-${roomId}`).emit("game.revealed", {
     envelopes,
+  })
+}
+
+// ─── Reset Game ───────────────────────────────────────────────
+
+export async function resetGame(roomId: string, creatorId: string): Promise<void> {
+  const room = await getRoom(roomId)
+  if (!room) throw new Error("Room not found")
+  if (room.creatorId !== creatorId) throw new Error("Only the creator can reset")
+  if (room.status === "waiting") throw new Error("Game hasn't started yet")
+
+  const pipe = redis.pipeline()
+
+  // Delete all envelope keys
+  for (let i = 0; i < room.envelopeCount; i++) {
+    pipe.del(`room:${roomId}:envelope:${i}`)
+  }
+
+  // Reset all players' envelopeIndex to -1
+  const playerIds = await redis.smembers(`room:${roomId}:players`)
+  for (const pid of playerIds) {
+    pipe.hset(`room:${roomId}:player:${pid}`, { envelopeIndex: "-1" })
+  }
+
+  // Delete trades
+  pipe.del(`room:${roomId}:trades`)
+
+  // Reset room status and envelope count
+  pipe.hset(`room:${roomId}`, { status: "waiting", envelopeCount: "0" })
+
+  await pipe.exec()
+
+  await realtime.channel(`room-${roomId}`).emit("game.statusChanged", {
+    status: "waiting",
   })
 }
 
