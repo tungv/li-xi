@@ -5,15 +5,27 @@ export function envelopeCode(index: number): string {
   return `E${(index + 1).toString().padStart(2, "0")}`
 }
 
-export const HORSE_DECORATIONS = [
-  "🐴", // Horse Face
-  "🎠", // Carousel Horse
-  "🏇", // Horse Racing
-  "🦄", // Unicorn
-  "🐎", // Horse
+export const DECORATIONS = [
+  "🧧", // Red Envelope
   "🐲", // Dragon
-  "🦓", // Zebra
-  "🎪", // Circus Tent (Pegasus theme)
+  "🏮", // Red Lantern
+  "🎆", // Fireworks
+  "🎋", // Tanabata Tree
+  "🎊", // Confetti Ball
+  "🐍", // Snake (2025 zodiac)
+  "🎇", // Sparkler
+  "🧨", // Firecracker
+  "🪭", // Folding Fan
+  "🍊", // Tangerine (luck)
+  "💮", // White Flower
+  "🎎", // Japanese Dolls
+  "🐉", // Dragon Face
+  "🌸", // Cherry Blossom
+  "🎐", // Wind Chime
+  "🦁", // Lion (lion dance)
+  "🐯", // Tiger
+  "🐰", // Rabbit
+  "🪷", // Lotus
 ]
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -34,7 +46,7 @@ export function generateEnvelopes(prizes: PrizeConfig[]): Envelope[] {
       envelopes.push({
         index,
         amount: prize.amount,
-        decoration: HORSE_DECORATIONS[index % HORSE_DECORATIONS.length],
+        decoration: DECORATIONS[index % DECORATIONS.length],
         code: envelopeCode(index),
         status: "available",
         pickedBy: "",
@@ -51,6 +63,6 @@ export function generateEnvelopes(prizes: PrizeConfig[]): Envelope[] {
     ...env,
     index: i,
     code: envelopeCode(i),
-    decoration: HORSE_DECORATIONS[i % HORSE_DECORATIONS.length],
+    decoration: DECORATIONS[i % DECORATIONS.length],
   }))
 }

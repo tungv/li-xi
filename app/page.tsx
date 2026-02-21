@@ -74,7 +74,7 @@ export default function HomePage() {
 
         {/* Footer */}
         <div className="text-center text-xs text-red-300 pt-4 border-t border-red-100">
-          🐴 🎠 🏇 🦄 🐎 🐲 🦓 🎪
+          🧧 🐲 🏮 🎆 🎋 🎊 🐍 🎇 🧨 🪭 🍊 💮 🎎 🐉 🌸 🎐 🦁 🐯 🐰 🪷
         </div>
       </div>
     </div>
