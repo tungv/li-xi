@@ -1,15 +1,17 @@
 "use client"
 
-import type { Player, RoomStatus } from "@/types"
+import type { Envelope, Player, RoomStatus } from "@/types"
 
 export function PlayerList({
   players,
+  envelopes = [],
   currentPlayerId,
   roomStatus,
   creatorId,
   onOfferTrade,
 }: {
   players: Player[]
+  envelopes?: Envelope[]
   currentPlayerId: string
   roomStatus: RoomStatus
   creatorId: string
@@ -25,6 +27,9 @@ export function PlayerList({
           const isMe = player.id === currentPlayerId
           const isCreator = player.id === creatorId
           const hasPicked = player.envelopeIndex !== -1
+          const pickedEnvelope = hasPicked
+            ? envelopes.find((e) => e.index === player.envelopeIndex)
+            : undefined
           const canTrade =
             roomStatus === "trading" &&
             !isMe &&
@@ -54,15 +59,16 @@ export function PlayerList({
               </div>
               <div className="flex items-center gap-2">
                 {roomStatus === "picking" && (
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      hasPicked
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {hasPicked ? "Picked" : "Choosing..."}
-                  </span>
+                  hasPicked && pickedEnvelope ? (
+                    <span className="flex items-center gap-1">
+                      <span className="text-xl leading-none">{pickedEnvelope.decoration}</span>
+                      <span className="text-xs font-mono text-red-400">{pickedEnvelope.code}</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                      Choosing...
+                    </span>
+                  )
                 )}
                 {canTrade && onOfferTrade && (
                   <button

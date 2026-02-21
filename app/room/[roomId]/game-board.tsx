@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useOptimistic, useActionState } from "react"
 import { useRealtime } from "@/lib/realtime-client"
 import type { GameState, Player, Envelope, Trade, RoomStatus } from "@/types"
 import { envelopeCode } from "@/lib/envelopes"
@@ -81,6 +81,11 @@ function PickingProgress({ players }: { players: Player[] }) {
   )
 }
 
+// ── Shared action state shape ──────────────────────────────────
+
+type ActionState = { error: string | null }
+const OK: ActionState = { error: null }
+
 // ── Main Game Board ────────────────────────────────────────────
 
 export function GameBoard({
@@ -98,10 +103,129 @@ export function GameBoard({
   const [players, setPlayers] = useState<Player[]>(initialState.players)
   const [envelopes, setEnvelopes] = useState<Envelope[]>(initialState.envelopes)
   const [trades, setTrades] = useState<Trade[]>(initialState.trades)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
 
-  // Subscribe to realtime events for this room
+  // ── Optimistic envelope state during the pick transition ──────
+  // Shows the picked envelope immediately while the server request is in flight.
+  const [optimisticEnvelopes, addOptimisticPick] = useOptimistic(
+    envelopes,
+    (state, { envelopeIndex, pid }: { envelopeIndex: number; pid: string }) =>
+      state.map((e) =>
+        e.index === envelopeIndex
+          ? { ...e, status: "picked" as const, pickedBy: pid }
+          : e
+      )
+  )
+
+  // Optimistically mark the current player as having picked so the progress
+  // bar and "You picked!" banner update immediately.
+  const [optimisticPlayers, addOptimisticPlayerPick] = useOptimistic(
+    players,
+    (state, { pid, envelopeIndex }: { pid: string; envelopeIndex: number }) =>
+      state.map((p) => (p.id === pid ? { ...p, envelopeIndex } : p))
+  )
+
+  // ── Shared fetch helper ───────────────────────────────────────
+  async function post(url: string, body?: Record<string, unknown>) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId, playerName, ...body }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error)
+    return data
+  }
+
+  // ── Per-action state via useActionState ───────────────────────
+  // Each action has its own pending flag and error, so unrelated buttons
+  // are never blocked by a sibling action that is still in flight.
+
+  const [startState, dispatchStart, isStartPending] = useActionState(
+    async (_prev: ActionState): Promise<ActionState> => {
+      try {
+        await post(`/api/room/${roomId}/start`)
+        return OK
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "Failed to start game" }
+      }
+    },
+    OK
+  )
+
+  const [pickState, dispatchPick, isPickPending] = useActionState(
+    async (_prev: ActionState, envelopeIndex: number): Promise<ActionState> => {
+      // Fire optimistic updates before the request so the UI responds instantly.
+      addOptimisticPick({ envelopeIndex, pid: playerId })
+      addOptimisticPlayerPick({ pid: playerId, envelopeIndex })
+      try {
+        await post(`/api/room/${roomId}/pick`, { envelopeIndex })
+        return OK
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "Failed to pick envelope" }
+      }
+    },
+    OK
+  )
+
+  const [revealState, dispatchReveal, isRevealPending] = useActionState(
+    async (_prev: ActionState): Promise<ActionState> => {
+      try {
+        await post(`/api/room/${roomId}/reveal`)
+        return OK
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "Failed to reveal envelopes" }
+      }
+    },
+    OK
+  )
+
+  const [resetState, dispatchReset, isResetPending] = useActionState(
+    async (_prev: ActionState): Promise<ActionState> => {
+      try {
+        await post(`/api/room/${roomId}/reset`)
+        return OK
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "Failed to reset game" }
+      }
+    },
+    OK
+  )
+
+  const [offerTradeState, dispatchOfferTrade, isOfferTradePending] = useActionState(
+    async (_prev: ActionState, toPlayerId: string): Promise<ActionState> => {
+      try {
+        await post(`/api/room/${roomId}/trade/offer`, { toPlayerId })
+        return OK
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "Failed to offer trade" }
+      }
+    },
+    OK
+  )
+
+  const [respondTradeState, dispatchRespondTrade, isRespondTradePending] =
+    useActionState(
+      async (
+        _prev: ActionState,
+        payload: { tradeId: string; accept: boolean }
+      ): Promise<ActionState> => {
+        try {
+          await post(`/api/room/${roomId}/trade/respond`, payload)
+          return OK
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : "Failed to respond to trade" }
+        }
+      },
+      OK
+    )
+
+  // Adapter so TradePanel's (tradeId, accept) signature maps to the single-
+  // payload dispatch expected by useActionState.
+  function handleRespondTrade(tradeId: string, accept: boolean) {
+    dispatchRespondTrade({ tradeId, accept })
+  }
+
+  // ── Realtime event subscriptions ─────────────────────────────
   useRealtime({
     channels: [`room-${roomId}`],
     events: [
@@ -154,13 +278,10 @@ export function GameBoard({
         case "game.statusChanged": {
           const d = data as { status: string }
           setRoom((prev) => ({ ...prev, status: d.status as RoomStatus }))
-          // If reset to waiting, clear envelopes, trades, and player picks
           if (d.status === "waiting") {
             setEnvelopes([])
             setTrades([])
-            setPlayers((prev) =>
-              prev.map((p) => ({ ...p, envelopeIndex: -1 }))
-            )
+            setPlayers((prev) => prev.map((p) => ({ ...p, envelopeIndex: -1 })))
           }
           break
         }
@@ -171,6 +292,7 @@ export function GameBoard({
             playerId: string
             playerName: string
           }
+          // Reconcile with the server-confirmed pick, replacing the optimistic state.
           setEnvelopes((prev) =>
             prev.map((e) =>
               e.index === d.envelopeIndex
@@ -180,9 +302,7 @@ export function GameBoard({
           )
           setPlayers((prev) =>
             prev.map((p) =>
-              p.id === d.playerId
-                ? { ...p, envelopeIndex: d.envelopeIndex }
-                : p
+              p.id === d.playerId ? { ...p, envelopeIndex: d.envelopeIndex } : p
             )
           )
           break
@@ -232,7 +352,6 @@ export function GameBoard({
             )
           )
           if (d.accepted) {
-            // Swap envelope ownership in local state
             setEnvelopes((prev) =>
               prev.map((e) => {
                 if (e.pickedBy === d.fromPlayerId) return { ...e, pickedBy: d.toPlayerId }
@@ -243,11 +362,13 @@ export function GameBoard({
             setPlayers((prev) =>
               prev.map((p) => {
                 if (p.id === d.fromPlayerId) {
-                  const otherEnv = prev.find((pp) => pp.id === d.toPlayerId)?.envelopeIndex ?? p.envelopeIndex
+                  const otherEnv =
+                    prev.find((pp) => pp.id === d.toPlayerId)?.envelopeIndex ?? p.envelopeIndex
                   return { ...p, envelopeIndex: otherEnv }
                 }
                 if (p.id === d.toPlayerId) {
-                  const otherEnv = prev.find((pp) => pp.id === d.fromPlayerId)?.envelopeIndex ?? p.envelopeIndex
+                  const otherEnv =
+                    prev.find((pp) => pp.id === d.fromPlayerId)?.envelopeIndex ?? p.envelopeIndex
                   return { ...p, envelopeIndex: otherEnv }
                 }
                 return p
@@ -271,11 +392,7 @@ export function GameBoard({
             prev.map((e) => {
               const revealed = d.envelopes.find((r) => r.index === e.index)
               if (!revealed) return e
-              return {
-                ...e,
-                amount: revealed.amount,
-                pickedBy: revealed.pickedBy,
-              }
+              return { ...e, amount: revealed.amount, pickedBy: revealed.pickedBy }
             })
           )
           break
@@ -284,56 +401,21 @@ export function GameBoard({
     },
   })
 
-  const apiCall = useCallback(
-    async (url: string, body: Record<string, unknown>) => {
-      setError("")
-      setLoading(true)
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ playerId, playerName, ...body }),
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error)
-        return data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong")
-        throw err
-      } finally {
-        setLoading(false)
-      }
-    },
-    [playerId, playerName]
-  )
-
-  async function handleStart() {
-    await apiCall(`/api/room/${roomId}/start`, {})
-  }
-
-  async function handlePick(envelopeIndex: number) {
-    await apiCall(`/api/room/${roomId}/pick`, { envelopeIndex })
-  }
-
-  async function handleOfferTrade(toPlayerId: string) {
-    await apiCall(`/api/room/${roomId}/trade/offer`, { toPlayerId })
-  }
-
-  async function handleRespondTrade(tradeId: string, accept: boolean) {
-    await apiCall(`/api/room/${roomId}/trade/respond`, { tradeId, accept })
-  }
-
-  async function handleReveal() {
-    await apiCall(`/api/room/${roomId}/reveal`, {})
-  }
-
-  async function handleReset() {
-    await apiCall(`/api/room/${roomId}/reset`, {})
-  }
-
-  const currentPlayer = players.find((p) => p.id === playerId)
+  // ── Derived state ─────────────────────────────────────────────
+  // Use optimistic player state so hasPicked reflects a pending pick too.
+  const currentPlayer = optimisticPlayers.find((p) => p.id === playerId)
   const hasPicked = currentPlayer ? currentPlayer.envelopeIndex !== -1 : false
   const isCreator = room.creatorId === playerId
+
+  // Surface the first non-null error from any action for the global banner.
+  // Errors clear automatically when the corresponding action is dispatched again.
+  const error =
+    pickState.error ??
+    startState.error ??
+    revealState.error ??
+    resetState.error ??
+    offerTradeState.error ??
+    respondTradeState.error
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
@@ -344,25 +426,19 @@ export function GameBoard({
         <PhaseIndicator status={room.status} />
         {isCreator && room.status !== "waiting" && (
           <button
-            onClick={handleReset}
-            disabled={loading}
+            onClick={() => dispatchReset()}
+            disabled={isResetPending}
             className="mt-1 px-4 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:text-red-700 disabled:opacity-50 transition-colors"
           >
-            Reset to Lobby
+            {isResetPending ? "Resetting..." : "Reset to Lobby"}
           </button>
         )}
       </div>
 
-      {/* Error banner (dismissible) */}
+      {/* Error banner — clears automatically on the next action dispatch */}
       {error && (
-        <div className="flex items-center justify-between text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg">
-          <span>{error}</span>
-          <button
-            onClick={() => setError("")}
-            className="ml-2 text-red-400 hover:text-red-600 font-bold"
-          >
-            ×
-          </button>
+        <div className="text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg">
+          {error}
         </div>
       )}
 
@@ -373,15 +449,14 @@ export function GameBoard({
           players={players}
           currentPlayerId={playerId}
           creatorId={room.creatorId}
-          onStart={handleStart}
-          loading={loading}
+          onStart={dispatchStart}
+          loading={isStartPending}
         />
       )}
 
       {/* Phase: Picking */}
       {room.status === "picking" && (
         <div className="space-y-4">
-          {/* Instruction banner */}
           {!hasPicked ? (
             <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-center animate-pulse">
               <p className="text-yellow-800 font-bold text-sm">
@@ -402,18 +477,21 @@ export function GameBoard({
             </div>
           )}
 
-          <PickingProgress players={players} />
+          {/* optimisticPlayers drives the progress bar so it updates instantly */}
+          <PickingProgress players={optimisticPlayers} />
 
+          {/* optimisticEnvelopes + optimisticPlayers give instant visual feedback */}
           <EnvelopeGrid
-            envelopes={envelopes}
-            players={players}
+            envelopes={optimisticEnvelopes}
+            players={optimisticPlayers}
             currentPlayerId={playerId}
             isRevealed={false}
-            canPick={!hasPicked}
-            onPick={handlePick}
+            canPick={!hasPicked && !isPickPending}
+            onPick={dispatchPick}
           />
           <PlayerList
-            players={players}
+            players={optimisticPlayers}
+            envelopes={optimisticEnvelopes}
             currentPlayerId={playerId}
             roomStatus="picking"
             creatorId={room.creatorId}
@@ -449,24 +527,24 @@ export function GameBoard({
               currentPlayerId={playerId}
               roomStatus="trading"
               creatorId={room.creatorId}
-              onOfferTrade={handleOfferTrade}
+              onOfferTrade={isOfferTradePending ? undefined : dispatchOfferTrade}
             />
             <TradePanel
               trades={trades}
               players={players}
               envelopes={envelopes}
               currentPlayerId={playerId}
-              onRespond={handleRespondTrade}
+              onRespond={isRespondTradePending ? () => {} : handleRespondTrade}
             />
           </div>
           {isCreator && (
             <div className="text-center pt-2">
               <button
-                onClick={handleReveal}
-                disabled={loading}
+                onClick={() => dispatchReveal()}
+                disabled={isRevealPending}
                 className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold text-lg rounded-xl hover:from-yellow-600 hover:to-yellow-700 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
               >
-                {loading ? "Revealing..." : "Reveal All Envelopes! 🎊"}
+                {isRevealPending ? "Revealing..." : "Reveal All Envelopes! 🎊"}
               </button>
             </div>
           )}
@@ -504,11 +582,11 @@ export function GameBoard({
           <div className="text-center pt-2 space-y-3">
             {isCreator && (
               <button
-                onClick={handleReset}
-                disabled={loading}
+                onClick={() => dispatchReset()}
+                disabled={isResetPending}
                 className="px-6 py-2.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 disabled:opacity-50 transition-colors"
               >
-                Play Again in This Room
+                {isResetPending ? "Resetting..." : "Play Again in This Room"}
               </button>
             )}
             <div>
