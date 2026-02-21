@@ -499,6 +499,25 @@ export function GameBoard({
             envelopes={envelopes}
             currentPlayerId={playerId}
           />
+          <div className="text-center pt-2 space-y-3">
+            {isCreator && (
+              <button
+                onClick={handleReset}
+                disabled={loading}
+                className="px-6 py-2.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 disabled:opacity-50 transition-colors"
+              >
+                Play Again in This Room
+              </button>
+            )}
+            <div>
+              <a
+                href="/"
+                className="px-6 py-2.5 inline-block text-sm font-bold text-white bg-gradient-to-r from-red-600 to-red-700 rounded-xl hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl"
+              >
+                Create New Room 🧧
+              </a>
+            </div>
+          </div>
         </div>
       )}
     </div>
