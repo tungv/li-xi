@@ -131,7 +131,8 @@ export async function startGame(roomId: string, creatorId: string): Promise<void
     pipe.expire(`room:${roomId}:envelope:${env.index}`, ROOM_TTL)
   }
 
-  pipe.hset(`room:${roomId}`, { status: "picking", envelopeCount: envelopes.length.toString() })
+  const totalPrize = prizes.reduce((sum, p) => sum + p.amount * p.count, 0)
+  pipe.hset(`room:${roomId}`, { status: "picking", envelopeCount: envelopes.length.toString(), totalPrize: totalPrize.toString() })
 
   await pipe.exec()
 
@@ -569,6 +570,15 @@ export async function getRoom(roomId: string): Promise<Room | null> {
 export async function getRoomState(roomId: string, hideAmounts: boolean = true): Promise<GameState | null> {
   const room = await getRoom(roomId)
   if (!room) return null
+
+  // Backfill totalPrize for rooms created before the field existed
+  if (!room.totalPrize) {
+    const configData = await redis.get(`room:${roomId}:config`)
+    if (configData) {
+      const prizes: PrizeConfig[] = typeof configData === "string" ? JSON.parse(configData) : configData as PrizeConfig[]
+      room.totalPrize = prizes.reduce((sum, p) => sum + p.amount * p.count, 0)
+    }
+  }
 
   const playerIds = await redis.smembers(`room:${roomId}:players`)
 
