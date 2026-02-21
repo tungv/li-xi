@@ -1,5 +1,10 @@
 import type { PrizeConfig, Envelope } from "@/types"
 
+/** Returns a short, human-readable code for an envelope, e.g. "E01" */
+export function envelopeCode(index: number): string {
+  return `E${(index + 1).toString().padStart(2, "0")}`
+}
+
 export const HORSE_DECORATIONS = [
   "🐴", // Horse Face
   "🎠", // Carousel Horse
@@ -30,6 +35,7 @@ export function generateEnvelopes(prizes: PrizeConfig[]): Envelope[] {
         index,
         amount: prize.amount,
         decoration: HORSE_DECORATIONS[index % HORSE_DECORATIONS.length],
+        code: envelopeCode(index),
         status: "available",
         pickedBy: "",
       })
@@ -40,10 +46,11 @@ export function generateEnvelopes(prizes: PrizeConfig[]): Envelope[] {
   // Shuffle so amounts are randomized across positions
   const shuffled = shuffleArray(envelopes)
 
-  // Re-assign indices and decorations after shuffle
+  // Re-assign indices, codes, and decorations after shuffle
   return shuffled.map((env, i) => ({
     ...env,
     index: i,
+    code: envelopeCode(i),
     decoration: HORSE_DECORATIONS[i % HORSE_DECORATIONS.length],
   }))
 }

@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react"
 import { useRealtime } from "@/lib/realtime-client"
 import type { GameState, Player, Envelope, Trade, RoomStatus } from "@/types"
+import { envelopeCode } from "@/lib/envelopes"
 import { RoomLobby } from "@/app/components/room-lobby"
 import { EnvelopeGrid } from "@/app/components/envelope-grid"
 import { PlayerList } from "@/app/components/player-list"
@@ -142,6 +143,7 @@ export function GameBoard({
               index: i,
               amount: 0,
               decoration: dec,
+              code: envelopeCode(i),
               status: "available" as const,
               pickedBy: "",
             }))

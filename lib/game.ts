@@ -1,7 +1,7 @@
 import { redis } from "./redis"
 import { realtime } from "./realtime"
 import { generateRoomId } from "./utils"
-import { generateEnvelopes } from "./envelopes"
+import { generateEnvelopes, envelopeCode } from "./envelopes"
 import type { Room, Player, Envelope, Trade, PrizeConfig, GameState } from "@/types"
 import { nanoid } from "nanoid"
 
@@ -468,6 +468,7 @@ export async function getRoomState(roomId: string, hideAmounts: boolean = true):
           index: parseInt(data.index),
           amount: hideAmounts && room.status !== "revealed" ? 0 : parseInt(data.amount),
           decoration: data.decoration,
+          code: envelopeCode(parseInt(data.index)),
           status: data.status as Envelope["status"],
           pickedBy: data.pickedBy,
         })
