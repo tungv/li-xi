@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import type { PrizeConfig } from "@/types"
 
@@ -88,46 +88,44 @@ export function CreateRoomForm({
         <label className="block text-sm font-semibold text-red-900 mb-2">
           Prize Tiers
         </label>
-        <div className="grid grid-cols-[1fr_auto_4rem_auto] gap-x-2 gap-y-3 items-center">
+        <div className="space-y-3">
           {prizes.map((prize, i) => (
-            <Fragment key={i}>
-              <div>
+            <div key={i} className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
                 <input
                   type="number"
                   value={prize.amount || ""}
                   onChange={(e) => updateTier(i, "amount", Number(e.target.value))}
                   min={1000}
                   step={1000}
-                  className="w-full px-3 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900"
+                  className="w-full px-3 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900 tabular-nums"
                   placeholder="Amount"
                 />
                 <p className="mt-0.5 px-1 text-xs text-red-500 tabular-nums">
                   {prize.amount.toLocaleString()}
                 </p>
               </div>
-              <span className="text-red-700 font-medium text-center">×</span>
+              <span className="text-red-700 font-medium py-2">×</span>
               <input
                 type="number"
                 value={prize.count}
                 onChange={(e) => updateTier(i, "count", Number(e.target.value))}
                 min={1}
                 max={10}
-                className="w-full px-3 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900"
+                className="w-16 shrink-0 px-3 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900 text-center"
               />
-              <div className="flex justify-center">
-                {prizes.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => removeTier(i)}
-                    className="p-2 text-red-400 hover:text-red-600"
-                  >
-                    ✕
-                  </button>
-                ) : (
-                  <span className="p-2" />
-                )}
-              </div>
-            </Fragment>
+              {prizes.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => removeTier(i)}
+                  className="py-2 px-1 text-red-400 hover:text-red-600 shrink-0"
+                >
+                  ✕
+                </button>
+              ) : (
+                <span className="py-2 px-1 invisible">✕</span>
+              )}
+            </div>
           ))}
         </div>
         <button
