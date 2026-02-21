@@ -91,29 +91,34 @@ export function CreateRoomForm({
         <div className="space-y-3">
           {prizes.map((prize, i) => (
             <div key={i} className="flex items-center gap-2">
-              <input
-                type="number"
-                value={prize.amount}
-                onChange={(e) => updateTier(i, "amount", Number(e.target.value))}
-                min={1000}
-                step={1000}
-                className="flex-1 px-3 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900"
-                placeholder="Amount"
-              />
-              <span className="text-red-700 font-medium">x</span>
+              <div className="flex-1 min-w-0">
+                <input
+                  type="number"
+                  value={prize.amount}
+                  onChange={(e) => updateTier(i, "amount", Number(e.target.value))}
+                  min={1000}
+                  step={1000}
+                  className="w-full px-3 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900"
+                  placeholder="Amount"
+                />
+                <p className="mt-0.5 px-1 text-xs text-red-500 tabular-nums">
+                  {prize.amount.toLocaleString()}
+                </p>
+              </div>
+              <span className="text-red-700 font-medium shrink-0">x</span>
               <input
                 type="number"
                 value={prize.count}
                 onChange={(e) => updateTier(i, "count", Number(e.target.value))}
                 min={1}
                 max={10}
-                className="w-20 px-3 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900"
+                className="w-16 shrink-0 px-3 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900"
               />
               {prizes.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeTier(i)}
-                  className="p-2 text-red-400 hover:text-red-600"
+                  className="shrink-0 p-2 text-red-400 hover:text-red-600"
                 >
                   ✕
                 </button>
