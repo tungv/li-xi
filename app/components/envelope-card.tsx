@@ -44,6 +44,9 @@ export function EnvelopeCard({
             : "bg-gradient-to-b from-red-500 to-red-700 border-red-800"
         }`}
       >
+        <span className={`absolute top-1.5 right-2 font-mono text-[8px] tracking-wide ${isPickedByMe ? "text-yellow-900/40" : "text-white/35"}`}>
+          {envelope.code}
+        </span>
         <span className="text-2xl">{envelope.decoration}</span>
         <span className="text-white font-black text-xl drop-shadow">
           {envelope.amount.toLocaleString()}
@@ -63,6 +66,9 @@ export function EnvelopeCard({
   if (isRevealed && !envelope.pickedBy) {
     return (
       <div className="relative w-28 h-40 rounded-xl border-2 border-gray-300 bg-gray-100 flex flex-col items-center justify-center gap-2 opacity-50">
+        <span className="absolute top-1.5 right-2 font-mono text-[8px] tracking-wide text-gray-400/70">
+          {envelope.code}
+        </span>
         <span className="text-2xl grayscale">{envelope.decoration}</span>
         <span className="text-gray-500 text-sm font-bold">
           {envelope.amount.toLocaleString()}
@@ -76,6 +82,9 @@ export function EnvelopeCard({
   if (envelope.status === "picked" && isPickedByMe) {
     return (
       <div className="relative w-28 h-40 rounded-xl border-3 border-yellow-400 bg-gradient-to-b from-yellow-300 to-yellow-500 flex flex-col items-center justify-center gap-2 shadow-lg shadow-yellow-300/40">
+        <span className="absolute top-1.5 right-2 font-mono text-[8px] tracking-wide text-yellow-900/40">
+          {envelope.code}
+        </span>
         <span className="text-3xl">{envelope.decoration}</span>
         <span className="bg-yellow-700/30 text-yellow-900 text-[11px] font-bold px-3 py-1 rounded-full">
           YOUR PICK
@@ -89,6 +98,9 @@ export function EnvelopeCard({
   if (envelope.status === "picked") {
     return (
       <div className="relative w-28 h-40 rounded-xl border-2 border-red-300 bg-gradient-to-b from-red-300 to-red-400 flex flex-col items-center justify-center gap-2 opacity-60">
+        <span className="absolute top-1.5 right-2 font-mono text-[8px] tracking-wide text-white/40">
+          {envelope.code}
+        </span>
         <span className="text-2xl">{envelope.decoration}</span>
         <div className="w-7 h-7 rounded-full bg-white/80 flex items-center justify-center text-xs font-bold text-red-700">
           {picker?.name?.charAt(0).toUpperCase() || "?"}
@@ -113,6 +125,10 @@ export function EnvelopeCard({
             : "bg-gradient-to-b from-red-500 to-red-700 border-red-800 cursor-default"
       }`}
     >
+      <span className="absolute top-1.5 right-2 font-mono text-[8px] tracking-wide text-yellow-300/50">
+        {envelope.code}
+      </span>
+
       <span className={`text-4xl drop-shadow-md transition-transform ${canPick ? "group-hover:scale-110" : ""}`}>
         {envelope.decoration}
       </span>

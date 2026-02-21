@@ -26,6 +26,7 @@ export interface Envelope {
   index: number
   amount: number // 0 until revealed
   decoration: string
+  code: string // short identifier e.g. "E01"
   status: "available" | "picked"
   pickedBy: string
 }
