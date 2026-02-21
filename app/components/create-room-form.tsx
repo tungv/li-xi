@@ -94,7 +94,7 @@ export function CreateRoomForm({
               <div className="flex-1 min-w-0">
                 <input
                   type="number"
-                  value={prize.amount}
+                  value={prize.amount || ""}
                   onChange={(e) => updateTier(i, "amount", Number(e.target.value))}
                   min={1000}
                   step={1000}
