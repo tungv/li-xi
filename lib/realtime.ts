@@ -56,6 +56,11 @@ const schema = {
       fromEnvelopeIndex: z.number(),
       toEnvelopeIndex: z.number(),
     }),
+    cancelled: z.object({
+      tradeId: z.string(),
+      fromPlayerId: z.string(),
+      toPlayerId: z.string(),
+    }),
   },
 }
 

@@ -39,7 +39,7 @@ export interface Trade {
   toPlayerName: string
   fromEnvelopeIndex: number
   toEnvelopeIndex: number
-  status: "pending" | "accepted" | "declined"
+  status: "pending" | "accepted" | "declined" | "cancelled"
   createdAt: number
 }
 

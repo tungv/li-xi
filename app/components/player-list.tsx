@@ -1,10 +1,11 @@
 "use client"
 
-import type { Envelope, Player, RoomStatus } from "@/types"
+import type { Envelope, Player, RoomStatus, Trade } from "@/types"
 
 export function PlayerList({
   players,
   envelopes = [],
+  trades = [],
   currentPlayerId,
   roomStatus,
   creatorId,
@@ -12,16 +13,26 @@ export function PlayerList({
 }: {
   players: Player[]
   envelopes?: Envelope[]
+  trades?: Trade[]
   currentPlayerId: string
   roomStatus: RoomStatus
   creatorId: string
   onOfferTrade?: (toPlayerId: string) => void
 }) {
+  const myPendingOutgoing = trades.find(
+    (t) => t.fromPlayerId === currentPlayerId && t.status === "pending"
+  )
+
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold text-red-900 uppercase tracking-wide">
         Players ({players.length})
       </h3>
+      {myPendingOutgoing && roomStatus === "trading" && (
+        <p className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5">
+          Cancel your current offer before making a new one.
+        </p>
+      )}
       <div className="space-y-1.5">
         {players.map((player) => {
           const isMe = player.id === currentPlayerId
@@ -34,7 +45,8 @@ export function PlayerList({
             roomStatus === "trading" &&
             !isMe &&
             hasPicked &&
-            players.find((p) => p.id === currentPlayerId)?.envelopeIndex !== -1
+            players.find((p) => p.id === currentPlayerId)?.envelopeIndex !== -1 &&
+            !myPendingOutgoing
 
           return (
             <div

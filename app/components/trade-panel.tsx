@@ -8,12 +8,14 @@ export function TradePanel({
   envelopes,
   currentPlayerId,
   onRespond,
+  onCancel,
 }: {
   trades: Trade[]
   players: Player[]
   envelopes: Envelope[]
   currentPlayerId: string
   onRespond: (tradeId: string, accept: boolean) => void
+  onCancel: (tradeId: string) => void
 }) {
   const pendingForMe = trades.filter(
     (t) => t.toPlayerId === currentPlayerId && t.status === "pending"
@@ -22,6 +24,11 @@ export function TradePanel({
     (t) => t.fromPlayerId === currentPlayerId && t.status === "pending"
   )
   const completed = trades.filter((t) => t.status !== "pending").slice(0, 10)
+  const statusLabel = (status: Trade["status"]) => {
+    if (status === "accepted") return { text: "Traded!", className: "text-green-600" }
+    if (status === "declined") return { text: "Declined", className: "text-gray-500" }
+    return { text: "Cancelled", className: "text-gray-400" }
+  }
 
   function getPlayerName(id: string) {
     return players.find((p) => p.id === id)?.name || "Unknown"
@@ -92,7 +99,12 @@ export function TradePanel({
                 <span className="font-medium">{getPlayerName(trade.toPlayerId)}</span>
                 {" to respond..."}
               </div>
-              <span className="text-xs text-yellow-600 font-medium">Pending</span>
+              <button
+                onClick={() => onCancel(trade.id)}
+                className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium shrink-0 ml-3"
+              >
+                Cancel
+              </button>
             </div>
           ))}
         </div>
@@ -103,24 +115,21 @@ export function TradePanel({
           <h4 className="text-xs font-semibold text-red-900 uppercase tracking-wide">
             Trade History
           </h4>
-          {completed.map((trade) => (
-            <div
-              key={trade.id}
-              className="text-xs text-red-700 bg-white/40 rounded-lg px-3 py-2"
-            >
-              {getPlayerName(trade.fromPlayerId)}
-              {" & "}
-              {getPlayerName(trade.toPlayerId)}
-              {" — "}
-              <span
-                className={
-                  trade.status === "accepted" ? "text-green-600" : "text-gray-500"
-                }
+          {completed.map((trade) => {
+            const label = statusLabel(trade.status)
+            return (
+              <div
+                key={trade.id}
+                className="text-xs text-red-700 bg-white/40 rounded-lg px-3 py-2"
               >
-                {trade.status === "accepted" ? "Traded!" : "Declined"}
-              </span>
-            </div>
-          ))}
+                {getPlayerName(trade.fromPlayerId)}
+                {" & "}
+                {getPlayerName(trade.toPlayerId)}
+                {" — "}
+                <span className={label.className}>{label.text}</span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
