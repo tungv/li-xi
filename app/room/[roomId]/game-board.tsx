@@ -9,6 +9,79 @@ import { PlayerList } from "@/app/components/player-list"
 import { TradePanel } from "@/app/components/trade-panel"
 import { Leaderboard } from "@/app/components/leaderboard"
 
+// ── Phase Indicator (dot stepper) ──────────────────────────────
+const PHASES = ["waiting", "picking", "trading", "revealed"] as const
+const PHASE_LABELS = { waiting: "Lobby", picking: "Picking", trading: "Trading", revealed: "Revealed" }
+
+function PhaseIndicator({ status }: { status: RoomStatus }) {
+  const currentIdx = PHASES.indexOf(status)
+  return (
+    <div className="flex items-center justify-center gap-1">
+      {PHASES.map((phase, i) => (
+        <div key={phase} className="flex items-center gap-1">
+          <div className="flex flex-col items-center">
+            <div
+              className={`w-3 h-3 rounded-full transition-all ${
+                i < currentIdx
+                  ? "bg-green-500"
+                  : i === currentIdx
+                    ? "bg-red-600 ring-2 ring-red-300 ring-offset-1"
+                    : "bg-gray-300"
+              }`}
+            />
+            <span
+              className={`text-[10px] mt-0.5 ${
+                i === currentIdx ? "text-red-700 font-bold" : "text-gray-400"
+              }`}
+            >
+              {PHASE_LABELS[phase]}
+            </span>
+          </div>
+          {i < PHASES.length - 1 && (
+            <div
+              className={`w-8 h-0.5 mb-3 ${
+                i < currentIdx ? "bg-green-400" : "bg-gray-200"
+              }`}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Picking Progress Bar ───────────────────────────────────────
+
+function PickingProgress({ players }: { players: Player[] }) {
+  const picked = players.filter((p) => p.envelopeIndex !== -1).length
+  const total = players.length
+  const pct = total > 0 ? (picked / total) * 100 : 0
+
+  return (
+    <div className="bg-white/80 rounded-xl p-3 border border-red-100">
+      <div className="flex justify-between text-xs text-red-700 mb-1.5 font-medium">
+        <span>Players picked</span>
+        <span>
+          {picked} / {total}
+        </span>
+      </div>
+      <div className="h-2.5 bg-red-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-red-500 to-yellow-500 rounded-full transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {picked === total && (
+        <p className="text-xs text-green-600 mt-1.5 text-center font-semibold">
+          All players picked! Moving to trading...
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Main Game Board ────────────────────────────────────────────
+
 export function GameBoard({
   initialState,
   playerId,
@@ -249,18 +322,24 @@ export function GameBoard({
   const isCreator = room.creatorId === playerId
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
       {/* Room header */}
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-red-900">🧧 Li Xi</h1>
-        <p className="text-sm text-red-600 mt-1">
-          Room: {roomId} | {room.status.charAt(0).toUpperCase() + room.status.slice(1)}
-        </p>
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold text-red-900">🧧 Lì Xì</h1>
+        <p className="text-xs text-red-400 font-mono">Room {roomId}</p>
+        <PhaseIndicator status={room.status} />
       </div>
 
+      {/* Error banner (dismissible) */}
       {error && (
-        <div className="text-center text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg">
-          {error}
+        <div className="flex items-center justify-between text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg">
+          <span>{error}</span>
+          <button
+            onClick={() => setError("")}
+            className="ml-2 text-red-400 hover:text-red-600 font-bold"
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -278,14 +357,30 @@ export function GameBoard({
 
       {/* Phase: Picking */}
       {room.status === "picking" && (
-        <div className="space-y-6">
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-red-900">
-              {hasPicked
-                ? "Waiting for others to pick..."
-                : "Pick an envelope!"}
-            </h2>
-          </div>
+        <div className="space-y-4">
+          {/* Instruction banner */}
+          {!hasPicked ? (
+            <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-center animate-pulse">
+              <p className="text-yellow-800 font-bold text-sm">
+                👆 Tap a red envelope to pick it!
+              </p>
+              <p className="text-yellow-600 text-xs mt-0.5">
+                You can only pick one — choose wisely!
+              </p>
+            </div>
+          ) : (
+            <div className="bg-green-50 border border-green-300 rounded-xl p-3 text-center">
+              <p className="text-green-800 font-bold text-sm">
+                ✓ You picked your envelope!
+              </p>
+              <p className="text-green-600 text-xs mt-0.5">
+                Waiting for other players to pick theirs...
+              </p>
+            </div>
+          )}
+
+          <PickingProgress players={players} />
+
           <EnvelopeGrid
             envelopes={envelopes}
             players={players}
@@ -305,13 +400,18 @@ export function GameBoard({
 
       {/* Phase: Trading */}
       {room.status === "trading" && (
-        <div className="space-y-6">
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-red-900">Trading Phase</h2>
-            <p className="text-sm text-red-600">
-              Offer trades before the big reveal!
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+            <p className="text-blue-800 font-bold text-sm">
+              🔄 Trading Phase
+            </p>
+            <p className="text-blue-600 text-xs mt-0.5">
+              {isCreator
+                ? "Players can trade envelopes. Press Reveal when ready!"
+                : "Offer trades to other players before the host reveals!"}
             </p>
           </div>
+
           <EnvelopeGrid
             envelopes={envelopes}
             players={players}
@@ -320,7 +420,7 @@ export function GameBoard({
             canPick={false}
             onPick={() => {}}
           />
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <PlayerList
               players={players}
               currentPlayerId={playerId}
@@ -337,14 +437,21 @@ export function GameBoard({
             />
           </div>
           {isCreator && (
-            <div className="text-center">
+            <div className="text-center pt-2">
               <button
                 onClick={handleReveal}
                 disabled={loading}
-                className="px-8 py-3 bg-yellow-500 text-white font-bold text-lg rounded-xl hover:bg-yellow-600 disabled:opacity-50 transition-colors shadow-lg"
+                className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold text-lg rounded-xl hover:from-yellow-600 hover:to-yellow-700 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
               >
                 {loading ? "Revealing..." : "Reveal All Envelopes! 🎊"}
               </button>
+            </div>
+          )}
+          {!isCreator && (
+            <div className="text-center">
+              <p className="text-xs text-gray-400">
+                Waiting for {room.creatorName} to reveal the envelopes...
+              </p>
             </div>
           )}
         </div>
@@ -352,7 +459,12 @@ export function GameBoard({
 
       {/* Phase: Revealed */}
       {room.status === "revealed" && (
-        <div className="space-y-6">
+        <div className="space-y-5">
+          <div className="bg-gradient-to-r from-yellow-50 to-red-50 border border-yellow-200 rounded-xl p-3 text-center">
+            <p className="text-red-800 font-bold text-sm">
+              🎊 Envelopes Revealed!
+            </p>
+          </div>
           <EnvelopeGrid
             envelopes={envelopes}
             players={players}

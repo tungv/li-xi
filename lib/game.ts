@@ -149,23 +149,26 @@ export async function pickEnvelope(
   if (!playerData) throw new Error("Player not in room")
   if (playerData.envelopeIndex !== "-1") throw new Error("You already picked an envelope")
 
-  // Check envelope is available
-  const envelope = await redis.hgetall(`room:${roomId}:envelope:${envelopeIndex}`)
-  if (!envelope) throw new Error("Envelope not found")
-  if (envelope.status !== "available") throw new Error("Envelope already taken")
-
-  // Atomically claim the envelope using HSETNX
-  const claimed = await redis.hsetnx(
-    `room:${roomId}:envelope:${envelopeIndex}`,
-    "pickedBy",
-    playerId
+  // Atomically claim the envelope: check status=available AND set to picked in one Lua script
+  // This prevents two players from picking the same envelope simultaneously
+  const claimScript = `
+    local key = KEYS[1]
+    local status = redis.call('HGET', key, 'status')
+    if status ~= 'available' then
+      return 0
+    end
+    redis.call('HSET', key, 'status', 'picked', 'pickedBy', ARGV[1])
+    return 1
+  `
+  const claimed = await redis.eval(
+    claimScript,
+    [`room:${roomId}:envelope:${envelopeIndex}`],
+    [playerId]
   )
   if (!claimed) throw new Error("Envelope already taken")
 
-  const pipe = redis.pipeline()
-  pipe.hset(`room:${roomId}:envelope:${envelopeIndex}`, { status: "picked", pickedBy: playerId })
-  pipe.hset(`room:${roomId}:player:${playerId}`, { envelopeIndex: envelopeIndex.toString() })
-  await pipe.exec()
+  // Update the player's envelope index
+  await redis.hset(`room:${roomId}:player:${playerId}`, { envelopeIndex: envelopeIndex.toString() })
 
   await realtime.channel(`room-${roomId}`).emit("envelope.picked", {
     envelopeIndex,
