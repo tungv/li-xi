@@ -7,6 +7,7 @@ export interface Room {
   status: RoomStatus
   maxPlayers: number
   envelopeCount: number
+  totalPrize: number
   createdAt: number
 }
 

@@ -526,6 +526,11 @@ export function GameBoard({
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-red-900">🧧 Lì Xì</h1>
         <p className="text-xs text-red-400 font-mono">Room {roomId}</p>
+        {room.totalPrize > 0 && (
+          <p className="text-sm font-semibold text-red-700">
+            {room.envelopeCount} envelopes · {room.totalPrize.toLocaleString()}
+          </p>
+        )}
         <PhaseIndicator status={room.status} />
         {isCreator && room.status !== "waiting" && (
           <button

@@ -18,6 +18,7 @@ export async function createRoom(
   const roomId = generateRoomId()
   const now = Date.now()
   const envelopeCount = prizes.reduce((sum, p) => sum + p.count, 0)
+  const totalPrize = prizes.reduce((sum, p) => sum + p.amount * p.count, 0)
 
   const pipe = redis.pipeline()
 
@@ -28,6 +29,7 @@ export async function createRoom(
     status: "waiting",
     maxPlayers: maxPlayers.toString(),
     envelopeCount: envelopeCount.toString(),
+    totalPrize: totalPrize.toString(),
     createdAt: now.toString(),
   })
 
@@ -559,6 +561,7 @@ export async function getRoom(roomId: string): Promise<Room | null> {
     status: data.status as Room["status"],
     maxPlayers: parseInt(data.maxPlayers as string),
     envelopeCount: parseInt(data.envelopeCount as string),
+    totalPrize: parseInt(data.totalPrize as string) || 0,
     createdAt: parseInt(data.createdAt as string),
   }
 }
