@@ -409,7 +409,7 @@ export function GameBoard({
             players={players}
             currentPlayerId={playerId}
             isRevealed={false}
-            canPick={!hasPicked}
+            canPick={!hasPicked && !loading}
             onPick={handlePick}
           />
           <PlayerList
