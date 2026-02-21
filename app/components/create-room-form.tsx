@@ -35,6 +35,7 @@ export function CreateRoomForm({
   }
 
   const totalEnvelopes = prizes.reduce((sum, p) => sum + p.count, 0)
+  const totalPrize = prizes.reduce((sum, p) => sum + p.amount * p.count, 0)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -138,7 +139,7 @@ export function CreateRoomForm({
       </div>
 
       <div className="text-center text-sm text-red-700">
-        Total: {totalEnvelopes} envelopes
+        Total: {totalEnvelopes} envelopes · {totalPrize.toLocaleString()}
       </div>
 
       {error && (
