@@ -344,9 +344,9 @@ export function GameBoard({
           <button
             onClick={handleReset}
             disabled={loading}
-            className="text-xs text-gray-400 hover:text-red-500 underline disabled:opacity-50"
+            className="mt-1 px-4 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:text-red-700 disabled:opacity-50 transition-colors"
           >
-            Reset game
+            Reset to Lobby
           </button>
         )}
       </div>

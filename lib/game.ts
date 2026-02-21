@@ -384,7 +384,7 @@ export async function resetGame(roomId: string, creatorId: string): Promise<void
   const room = await getRoom(roomId)
   if (!room) throw new Error("Room not found")
   if (room.creatorId !== creatorId) throw new Error("Only the creator can reset")
-  if (room.status === "waiting") throw new Error("Game hasn't started yet")
+  if (room.status === "waiting") return // already in lobby, nothing to reset
 
   const pipe = redis.pipeline()
 
