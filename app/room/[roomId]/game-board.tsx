@@ -103,6 +103,7 @@ export function GameBoard({
   const [players, setPlayers] = useState<Player[]>(initialState.players)
   const [envelopes, setEnvelopes] = useState<Envelope[]>(initialState.envelopes)
   const [trades, setTrades] = useState<Trade[]>(initialState.trades)
+  const [kicked, setKicked] = useState(false)
 
   // ── Optimistic envelope state during the pick transition ──────
   // Shows the picked envelope immediately while the server request is in flight.
@@ -237,12 +238,51 @@ export function GameBoard({
     dispatchRespondTrade({ tradeId, accept })
   }
 
+  const [removePlayerState, dispatchRemovePlayer, isRemovePlayerPending] =
+    useActionState(
+      async (_prev: ActionState, targetPlayerId: string): Promise<ActionState> => {
+        try {
+          await post(`/api/room/${roomId}/kick`, { targetPlayerId })
+          return OK
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : "Failed to remove player" }
+        }
+      },
+      OK
+    )
+
+  const [renamePlayerState, dispatchRenamePlayer, isRenamePlayerPending] =
+    useActionState(
+      async (
+        _prev: ActionState,
+        payload: { targetPlayerId: string; newName: string }
+      ): Promise<ActionState> => {
+        try {
+          await post(`/api/room/${roomId}/rename`, payload)
+          return OK
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : "Failed to rename player" }
+        }
+      },
+      OK
+    )
+
+  function handleRemovePlayer(targetPlayerId: string) {
+    dispatchRemovePlayer(targetPlayerId)
+  }
+
+  function handleRenamePlayer(targetPlayerId: string, newName: string) {
+    dispatchRenamePlayer({ targetPlayerId, newName })
+  }
+
   // ── Realtime event subscriptions ─────────────────────────────
   useRealtime({
     channels: [`room-${roomId}`],
     events: [
       "player.joined",
       "player.left",
+      "player.removed",
+      "player.renamed",
       "game.started",
       "game.statusChanged",
       "game.revealed",
@@ -269,6 +309,24 @@ export function GameBoard({
               },
             ]
           })
+          break
+        }
+
+        case "player.removed": {
+          const d = data as { playerId: string; playerName: string }
+          if (d.playerId === playerId) {
+            setKicked(true)
+          } else {
+            setPlayers((prev) => prev.filter((p) => p.id !== d.playerId))
+          }
+          break
+        }
+
+        case "player.renamed": {
+          const d = data as { playerId: string; newName: string }
+          setPlayers((prev) =>
+            prev.map((p) => (p.id === d.playerId ? { ...p, name: d.newName } : p))
+          )
           break
         }
 
@@ -439,7 +497,27 @@ export function GameBoard({
     resetState.error ??
     offerTradeState.error ??
     cancelTradeState.error ??
-    respondTradeState.error
+    respondTradeState.error ??
+    removePlayerState.error ??
+    renamePlayerState.error
+
+  if (kicked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="bg-white/80 backdrop-blur rounded-2xl shadow-xl p-8 max-w-sm w-full text-center space-y-4">
+          <p className="text-4xl">🚪</p>
+          <h2 className="text-xl font-bold text-red-900">You were removed</h2>
+          <p className="text-sm text-red-600">The host removed you from the room.</p>
+          <a
+            href="/"
+            className="inline-block px-6 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-red-600 to-red-700 rounded-xl hover:from-red-700 hover:to-red-800 transition-all shadow-lg"
+          >
+            Back to Home
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
@@ -474,6 +552,8 @@ export function GameBoard({
           currentPlayerId={playerId}
           creatorId={room.creatorId}
           onStart={dispatchStart}
+          onRemovePlayer={isRemovePlayerPending ? undefined : handleRemovePlayer}
+          onRenamePlayer={isRenamePlayerPending ? undefined : handleRenamePlayer}
           loading={isStartPending}
         />
       )}

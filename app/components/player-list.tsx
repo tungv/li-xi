@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import type { Envelope, Player, RoomStatus, Trade } from "@/types"
 
 export function PlayerList({
@@ -10,6 +11,8 @@ export function PlayerList({
   roomStatus,
   creatorId,
   onOfferTrade,
+  onRemovePlayer,
+  onRenamePlayer,
 }: {
   players: Player[]
   envelopes?: Envelope[]
@@ -18,10 +21,31 @@ export function PlayerList({
   roomStatus: RoomStatus
   creatorId: string
   onOfferTrade?: (toPlayerId: string) => void
+  onRemovePlayer?: (targetPlayerId: string) => void
+  onRenamePlayer?: (targetPlayerId: string, newName: string) => void
 }) {
   const myPendingOutgoing = trades.find(
     (t) => t.fromPlayerId === currentPlayerId && t.status === "pending"
   )
+
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameInput, setRenameInput] = useState("")
+
+  const amCreator = currentPlayerId === creatorId
+  const canManagePlayers = amCreator && roomStatus === "waiting"
+
+  function startRename(player: Player) {
+    setRenamingId(player.id)
+    setRenameInput(player.name)
+  }
+
+  function submitRename(playerId: string) {
+    const trimmed = renameInput.trim()
+    if (trimmed && onRenamePlayer) {
+      onRenamePlayer(playerId, trimmed)
+    }
+    setRenamingId(null)
+  }
 
   return (
     <div className="space-y-2">
@@ -48,6 +72,8 @@ export function PlayerList({
             players.find((p) => p.id === currentPlayerId)?.envelopeIndex !== -1 &&
             !myPendingOutgoing
 
+          const isRenaming = renamingId === player.id
+
           return (
             <div
               key={player.id}
@@ -55,21 +81,49 @@ export function PlayerList({
                 isMe ? "bg-yellow-100 border border-yellow-300" : "bg-white/60"
               }`}
             >
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-red-200 flex items-center justify-center text-sm font-bold text-red-700">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-red-200 flex items-center justify-center text-sm font-bold text-red-700 shrink-0">
                   {player.name.charAt(0).toUpperCase()}
                 </div>
-                <div>
-                  <span className="text-sm font-medium text-red-900">
-                    {player.name}
-                    {isMe && " (you)"}
-                  </span>
+                <div className="min-w-0">
+                  {isRenaming ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        value={renameInput}
+                        onChange={(e) => setRenameInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") submitRename(player.id)
+                          if (e.key === "Escape") setRenamingId(null)
+                        }}
+                        maxLength={20}
+                        className="text-sm border border-red-300 rounded px-1.5 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-red-400"
+                      />
+                      <button
+                        onClick={() => submitRename(player.id)}
+                        className="text-xs px-2 py-0.5 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                      >
+                        OK
+                      </button>
+                      <button
+                        onClick={() => setRenamingId(null)}
+                        className="text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded hover:bg-gray-300 transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-sm font-medium text-red-900 truncate">
+                      {player.name}
+                      {isMe && " (you)"}
+                    </span>
+                  )}
                   {isCreator && (
                     <span className="ml-1 text-xs text-yellow-600">Host</span>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {roomStatus === "picking" && (
                   hasPicked && pickedEnvelope ? (
                     <span className="flex items-center gap-1">
@@ -89,6 +143,24 @@ export function PlayerList({
                   >
                     Trade
                   </button>
+                )}
+                {canManagePlayers && !isMe && !isRenaming && (
+                  <>
+                    <button
+                      onClick={() => startRename(player)}
+                      className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                      title="Force rename"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      onClick={() => onRemovePlayer?.(player.id)}
+                      className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                      title="Remove from room"
+                    >
+                      Remove
+                    </button>
+                  </>
                 )}
               </div>
             </div>
