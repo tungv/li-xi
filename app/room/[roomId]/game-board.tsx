@@ -491,6 +491,7 @@ export function GameBoard({
           />
           <PlayerList
             players={optimisticPlayers}
+            envelopes={optimisticEnvelopes}
             currentPlayerId={playerId}
             roomStatus="picking"
             creatorId={room.creatorId}
