@@ -109,7 +109,14 @@ export async function startGame(roomId: string, creatorId: string): Promise<void
 
   const envelopes = generateEnvelopes(prizes)
 
+  // Reset all players' envelopeIndex to -1 (clear stale state)
+  const playerIds = await redis.smembers(`room:${roomId}:players`)
+
   const pipe = redis.pipeline()
+
+  for (const pid of playerIds) {
+    pipe.hset(`room:${roomId}:player:${pid}`, { envelopeIndex: "-1" })
+  }
 
   for (const env of envelopes) {
     pipe.hset(`room:${roomId}:envelope:${env.index}`, {
@@ -122,7 +129,7 @@ export async function startGame(roomId: string, creatorId: string): Promise<void
     pipe.expire(`room:${roomId}:envelope:${env.index}`, ROOM_TTL)
   }
 
-  pipe.hset(`room:${roomId}`, { status: "picking" })
+  pipe.hset(`room:${roomId}`, { status: "picking", envelopeCount: envelopes.length.toString() })
 
   await pipe.exec()
 
@@ -187,13 +194,29 @@ export async function pickEnvelope(
   })
 
   // Check if all players have picked -> transition to trading
+  // We verify each player's envelope actually has them as pickedBy
+  // (not just that envelopeIndex is set, which could be stale)
   const playerIds = await redis.smembers(`room:${roomId}:players`)
   const playerPipe = redis.pipeline()
   for (const pid of playerIds) {
-    playerPipe.hget(`room:${roomId}:player:${pid}`, "envelopeIndex")
+    playerPipe.hgetall(`room:${roomId}:player:${pid}`)
   }
-  const results = await playerPipe.exec()
-  const allPicked = results.every((r) => r !== "-1" && r !== null)
+  const playerResults = await playerPipe.exec()
+
+  let allPicked = true
+  for (const pr of playerResults) {
+    const pd = pr as Record<string, string> | null
+    if (!pd || pd.envelopeIndex === "-1") {
+      allPicked = false
+      break
+    }
+    // Verify the envelope actually has this player
+    const env = await redis.hget(`room:${roomId}:envelope:${pd.envelopeIndex}`, "pickedBy")
+    if (env !== pd.id) {
+      allPicked = false
+      break
+    }
+  }
 
   if (allPicked) {
     await redis.hset(`room:${roomId}`, { status: "trading" })
