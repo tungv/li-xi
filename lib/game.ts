@@ -454,6 +454,68 @@ export async function resetGame(roomId: string, creatorId: string): Promise<void
   })
 }
 
+// ─── Remove Player ─────────────────────────────────────────────
+
+export async function removePlayer(
+  roomId: string,
+  creatorId: string,
+  targetPlayerId: string
+): Promise<void> {
+  const room = await getRoom(roomId)
+  if (!room) throw new Error("Room not found")
+  if (room.creatorId !== creatorId) throw new Error("Only the creator can remove players")
+  if (room.status !== "waiting") throw new Error("Players can only be removed in the lobby")
+  if (targetPlayerId === creatorId) throw new Error("Creator cannot remove themselves")
+
+  const isMember = await redis.sismember(`room:${roomId}:players`, targetPlayerId)
+  if (!isMember) throw new Error("Player not in room")
+
+  const playerData = await redis.hgetall(`room:${roomId}:player:${targetPlayerId}`)
+  const playerName = playerData?.name as string | undefined
+
+  const pipe = redis.pipeline()
+  pipe.srem(`room:${roomId}:players`, targetPlayerId)
+  pipe.del(`room:${roomId}:player:${targetPlayerId}`)
+  await pipe.exec()
+
+  await realtime.channel(`room-${roomId}`).emit("player.removed", {
+    playerId: targetPlayerId,
+    playerName: playerName ?? targetPlayerId,
+  })
+}
+
+// ─── Force Rename Player ────────────────────────────────────────
+
+export async function renamePlayer(
+  roomId: string,
+  creatorId: string,
+  targetPlayerId: string,
+  newName: string
+): Promise<void> {
+  const room = await getRoom(roomId)
+  if (!room) throw new Error("Room not found")
+  if (room.creatorId !== creatorId) throw new Error("Only the creator can rename players")
+  if (room.status !== "waiting") throw new Error("Players can only be renamed in the lobby")
+
+  const isMember = await redis.sismember(`room:${roomId}:players`, targetPlayerId)
+  if (!isMember) throw new Error("Player not in room")
+
+  const trimmed = newName.trim()
+  if (!trimmed || trimmed.length > 20) throw new Error("Name must be 1–20 characters")
+
+  await redis.hset(`room:${roomId}:player:${targetPlayerId}`, { name: trimmed })
+
+  // If renaming the creator themselves, update creatorName in the room hash too
+  if (targetPlayerId === creatorId) {
+    await redis.hset(`room:${roomId}`, { creatorName: trimmed })
+  }
+
+  await realtime.channel(`room-${roomId}`).emit("player.renamed", {
+    playerId: targetPlayerId,
+    newName: trimmed,
+  })
+}
+
 // ─── Read Helpers ──────────────────────────────────────────────
 
 export async function getRoom(roomId: string): Promise<Room | null> {

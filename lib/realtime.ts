@@ -11,6 +11,14 @@ const schema = {
     left: z.object({
       playerId: z.string(),
     }),
+    removed: z.object({
+      playerId: z.string(),
+      playerName: z.string(),
+    }),
+    renamed: z.object({
+      playerId: z.string(),
+      newName: z.string(),
+    }),
   },
   game: {
     started: z.object({

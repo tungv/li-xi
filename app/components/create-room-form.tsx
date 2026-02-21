@@ -88,10 +88,10 @@ export function CreateRoomForm({
         <label className="block text-sm font-semibold text-red-900 mb-2">
           Prize Tiers
         </label>
-        <div className="space-y-3">
+        <div className="grid grid-cols-[1fr_auto_4rem_auto] gap-x-2 gap-y-3 items-center">
           {prizes.map((prize, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <div className="flex-1 min-w-0">
+            <>
+              <div key={`amount-${i}`}>
                 <input
                   type="number"
                   value={prize.amount || ""}
@@ -105,25 +105,30 @@ export function CreateRoomForm({
                   {prize.amount.toLocaleString()}
                 </p>
               </div>
-              <span className="text-red-700 font-medium shrink-0">x</span>
+              <span key={`x-${i}`} className="text-red-700 font-medium text-center">×</span>
               <input
+                key={`count-${i}`}
                 type="number"
                 value={prize.count}
                 onChange={(e) => updateTier(i, "count", Number(e.target.value))}
                 min={1}
                 max={10}
-                className="w-16 shrink-0 px-3 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900"
+                className="w-full px-3 py-2 border-2 border-red-200 rounded-lg bg-white text-red-900"
               />
-              {prizes.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeTier(i)}
-                  className="shrink-0 p-2 text-red-400 hover:text-red-600"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+              <div key={`remove-${i}`} className="flex justify-center">
+                {prizes.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => removeTier(i)}
+                    className="p-2 text-red-400 hover:text-red-600"
+                  >
+                    ✕
+                  </button>
+                ) : (
+                  <span className="p-2" />
+                )}
+              </div>
+            </>
           ))}
         </div>
         <button

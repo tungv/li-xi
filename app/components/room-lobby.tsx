@@ -10,6 +10,8 @@ export function RoomLobby({
   currentPlayerId,
   creatorId,
   onStart,
+  onRemovePlayer,
+  onRenamePlayer,
   loading,
 }: {
   roomId: string
@@ -17,6 +19,8 @@ export function RoomLobby({
   currentPlayerId: string
   creatorId: string
   onStart: () => void
+  onRemovePlayer?: (targetPlayerId: string) => void
+  onRenamePlayer?: (targetPlayerId: string, newName: string) => void
   loading: boolean
 }) {
   const isCreator = currentPlayerId === creatorId
@@ -37,6 +41,8 @@ export function RoomLobby({
         currentPlayerId={currentPlayerId}
         roomStatus="waiting"
         creatorId={creatorId}
+        onRemovePlayer={onRemovePlayer}
+        onRenamePlayer={onRenamePlayer}
       />
 
       {isCreator && (
