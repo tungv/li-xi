@@ -102,9 +102,10 @@ export async function startGame(roomId: string, creatorId: string): Promise<void
   if (room.creatorId !== creatorId) throw new Error("Only the creator can start the game")
   if (room.status !== "waiting") throw new Error("Game already started")
 
-  const configStr = await redis.get<string>(`room:${roomId}:config`)
-  if (!configStr) throw new Error("Room config not found")
-  const prizes: PrizeConfig[] = JSON.parse(configStr)
+  const configData = await redis.get(`room:${roomId}:config`)
+  if (!configData) throw new Error("Room config not found")
+  // Upstash auto-deserializes JSON, so configData may already be an object
+  const prizes: PrizeConfig[] = typeof configData === "string" ? JSON.parse(configData) : configData as PrizeConfig[]
 
   const envelopes = generateEnvelopes(prizes)
 
