@@ -203,6 +203,18 @@ export function GameBoard({
     OK
   )
 
+  const [cancelTradeState, dispatchCancelTrade, isCancelTradePending] = useActionState(
+    async (_prev: ActionState, tradeId: string): Promise<ActionState> => {
+      try {
+        await post(`/api/room/${roomId}/trade/cancel`, { tradeId })
+        return OK
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "Failed to cancel trade" }
+      }
+    },
+    OK
+  )
+
   const [respondTradeState, dispatchRespondTrade, isRespondTradePending] =
     useActionState(
       async (
@@ -237,6 +249,7 @@ export function GameBoard({
       "envelope.picked",
       "trade.offered",
       "trade.responded",
+      "trade.cancelled",
     ],
     onData: (payload) => {
       const { event, data } = payload
@@ -378,6 +391,16 @@ export function GameBoard({
           break
         }
 
+        case "trade.cancelled": {
+          const d = data as { tradeId: string; fromPlayerId: string; toPlayerId: string }
+          setTrades((prev) =>
+            prev.map((t) =>
+              t.id === d.tradeId ? { ...t, status: "cancelled" as const } : t
+            )
+          )
+          break
+        }
+
         case "game.revealed": {
           const d = data as {
             envelopes: Array<{
@@ -415,6 +438,7 @@ export function GameBoard({
     revealState.error ??
     resetState.error ??
     offerTradeState.error ??
+    cancelTradeState.error ??
     respondTradeState.error
 
   return (
@@ -524,6 +548,7 @@ export function GameBoard({
           <div className="grid gap-4 md:grid-cols-2">
             <PlayerList
               players={players}
+              trades={trades}
               currentPlayerId={playerId}
               roomStatus="trading"
               creatorId={room.creatorId}
@@ -535,6 +560,7 @@ export function GameBoard({
               envelopes={envelopes}
               currentPlayerId={playerId}
               onRespond={isRespondTradePending ? () => {} : handleRespondTrade}
+              onCancel={isCancelTradePending ? () => {} : dispatchCancelTrade}
             />
           </div>
           {isCreator && (

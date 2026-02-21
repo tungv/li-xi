@@ -249,6 +249,18 @@ export async function offerTrade(
     throw new Error("Both players must have envelopes")
   }
 
+  // Enforce one active trade at a time: block if this player already has a pending outgoing offer
+  const existingTradesRaw = await redis.lrange(`room:${roomId}:trades`, 0, -1)
+  const existingTrades: Trade[] = existingTradesRaw.map((t) =>
+    (typeof t === "string" ? JSON.parse(t) : t) as Trade
+  )
+  const hasPendingOutgoing = existingTrades.some(
+    (t) => t.fromPlayerId === fromPlayerId && t.status === "pending"
+  )
+  if (hasPendingOutgoing) {
+    throw new Error("You already have a pending trade offer. Cancel it before making a new one.")
+  }
+
   const tradeId = nanoid(8)
   const trade: Trade = {
     id: tradeId,
@@ -340,6 +352,36 @@ export async function respondTrade(
     toPlayerId: trade.toPlayerId,
     fromEnvelopeIndex: trade.fromEnvelopeIndex,
     toEnvelopeIndex: trade.toEnvelopeIndex,
+  })
+}
+
+// ─── Cancel Trade ──────────────────────────────────────────────
+
+export async function cancelTrade(
+  roomId: string,
+  tradeId: string,
+  requesterId: string
+): Promise<void> {
+  const room = await getRoom(roomId)
+  if (!room) throw new Error("Room not found")
+  if (room.status !== "trading") throw new Error("Not in trading phase")
+
+  const tradesRaw = await redis.lrange(`room:${roomId}:trades`, 0, -1)
+  const trades: Trade[] = tradesRaw.map((t) => (typeof t === "string" ? JSON.parse(t) : t) as Trade)
+  const tradeIndex = trades.findIndex((t) => t.id === tradeId)
+  if (tradeIndex === -1) throw new Error("Trade not found")
+
+  const trade = trades[tradeIndex]
+  if (trade.fromPlayerId !== requesterId) throw new Error("Only the sender can cancel this offer")
+  if (trade.status !== "pending") throw new Error("Trade is no longer pending")
+
+  trade.status = "cancelled"
+  await redis.lset(`room:${roomId}:trades`, tradeIndex, JSON.stringify(trade))
+
+  await realtime.channel(`room-${roomId}`).emit("trade.cancelled", {
+    tradeId,
+    fromPlayerId: trade.fromPlayerId,
+    toPlayerId: trade.toPlayerId,
   })
 }
 
