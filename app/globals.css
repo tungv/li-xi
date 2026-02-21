@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@theme {
+  --color-red-envelope: #c0392b;
+  --color-gold: #f1c40f;
+  --color-gold-dark: #d4a017;
+  --color-red-dark: #922b21;
+}
