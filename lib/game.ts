@@ -261,6 +261,16 @@ export async function offerTrade(
     throw new Error("You already have a pending trade offer. Cancel it before making a new one.")
   }
 
+  // Check if the target player already has a pending offer TO us — auto-accept it
+  const matchingIncoming = existingTrades.find(
+    (t) => t.fromPlayerId === toPlayerId && t.toPlayerId === fromPlayerId && t.status === "pending"
+  )
+  if (matchingIncoming) {
+    // Auto-accept the existing incoming trade instead of creating a new one
+    await respondTrade(roomId, matchingIncoming.id, fromPlayerId, true)
+    return matchingIncoming.id
+  }
+
   const tradeId = nanoid(8)
   const trade: Trade = {
     id: tradeId,
@@ -353,6 +363,27 @@ export async function respondTrade(
     fromEnvelopeIndex: trade.fromEnvelopeIndex,
     toEnvelopeIndex: trade.toEnvelopeIndex,
   })
+
+  // After accepting, auto-decline all other pending trades involving either player
+  if (accept) {
+    const involvedIds = new Set([trade.fromPlayerId, trade.toPlayerId])
+    for (let i = 0; i < trades.length; i++) {
+      const t = trades[i]
+      if (t.id === tradeId || t.status !== "pending") continue
+      if (!involvedIds.has(t.fromPlayerId) && !involvedIds.has(t.toPlayerId)) continue
+
+      t.status = "declined"
+      await redis.lset(`room:${roomId}:trades`, i, JSON.stringify(t))
+      await realtime.channel(`room-${roomId}`).emit("trade.responded", {
+        tradeId: t.id,
+        accepted: false,
+        fromPlayerId: t.fromPlayerId,
+        toPlayerId: t.toPlayerId,
+        fromEnvelopeIndex: t.fromEnvelopeIndex,
+        toEnvelopeIndex: t.toEnvelopeIndex,
+      })
+    }
+  }
 }
 
 // ─── Cancel Trade ──────────────────────────────────────────────

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useOptimistic, useActionState } from "react"
+import { useState, useOptimistic, useActionState, useTransition } from "react"
 import { useRealtime } from "@/lib/realtime-client"
 import type { GameState, Player, Envelope, Trade, RoomStatus } from "@/types"
 import { envelopeCode } from "@/lib/envelopes"
@@ -104,6 +104,7 @@ export function GameBoard({
   const [envelopes, setEnvelopes] = useState<Envelope[]>(initialState.envelopes)
   const [trades, setTrades] = useState<Trade[]>(initialState.trades)
   const [kicked, setKicked] = useState(false)
+  const [, startTransition] = useTransition()
 
   // ── Optimistic envelope state during the pick transition ──────
   // Shows the picked envelope immediately while the server request is in flight.
@@ -528,7 +529,7 @@ export function GameBoard({
         <PhaseIndicator status={room.status} />
         {isCreator && room.status !== "waiting" && (
           <button
-            onClick={() => dispatchReset()}
+            onClick={() => startTransition(() => dispatchReset())}
             disabled={isResetPending}
             className="mt-1 px-4 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:text-red-700 disabled:opacity-50 transition-colors"
           >
@@ -625,28 +626,27 @@ export function GameBoard({
             canPick={false}
             onPick={() => {}}
           />
-          <div className="grid gap-4 md:grid-cols-2">
-            <PlayerList
-              players={players}
-              trades={trades}
-              currentPlayerId={playerId}
-              roomStatus="trading"
-              creatorId={room.creatorId}
-              onOfferTrade={isOfferTradePending ? undefined : dispatchOfferTrade}
-            />
-            <TradePanel
-              trades={trades}
-              players={players}
-              envelopes={envelopes}
-              currentPlayerId={playerId}
-              onRespond={isRespondTradePending ? () => {} : handleRespondTrade}
-              onCancel={isCancelTradePending ? () => {} : dispatchCancelTrade}
-            />
-          </div>
+          <PlayerList
+            players={players}
+            envelopes={envelopes}
+            trades={trades}
+            currentPlayerId={playerId}
+            roomStatus="trading"
+            creatorId={room.creatorId}
+            onOfferTrade={isOfferTradePending ? undefined : dispatchOfferTrade}
+          />
+          <TradePanel
+            trades={trades}
+            players={players}
+            envelopes={envelopes}
+            currentPlayerId={playerId}
+            onRespond={isRespondTradePending ? () => {} : handleRespondTrade}
+            onCancel={isCancelTradePending ? () => {} : dispatchCancelTrade}
+          />
           {isCreator && (
             <div className="text-center pt-2">
               <button
-                onClick={() => dispatchReveal()}
+                onClick={() => startTransition(() => dispatchReveal())}
                 disabled={isRevealPending}
                 className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold text-lg rounded-xl hover:from-yellow-600 hover:to-yellow-700 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
               >
@@ -688,7 +688,7 @@ export function GameBoard({
           <div className="text-center pt-2 space-y-3">
             {isCreator && (
               <button
-                onClick={() => dispatchReset()}
+                onClick={() => startTransition(() => dispatchReset())}
                 disabled={isResetPending}
                 className="px-6 py-2.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 disabled:opacity-50 transition-colors"
               >

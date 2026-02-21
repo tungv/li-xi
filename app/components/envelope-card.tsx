@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import type { Envelope, Player } from "@/types"
 
 export function EnvelopeCard({
@@ -19,6 +19,7 @@ export function EnvelopeCard({
   onPick: () => void
 }) {
   const [picking, setPicking] = useState(false)
+  const [, startTransition] = useTransition()
   const picker = envelope.pickedBy
     ? players.find((p) => p.id === envelope.pickedBy)
     : null
@@ -28,7 +29,7 @@ export function EnvelopeCard({
     if (!canPick || picking) return
     setPicking(true)
     try {
-      await onPick()
+      startTransition(() => onPick())
     } finally {
       setPicking(false)
     }

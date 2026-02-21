@@ -1,5 +1,6 @@
 "use client"
 
+import { useTransition } from "react"
 import type { Player } from "@/types"
 import { ShareLink } from "./share-link"
 import { PlayerList } from "./player-list"
@@ -23,6 +24,7 @@ export function RoomLobby({
   onRenamePlayer?: (targetPlayerId: string, newName: string) => void
   loading: boolean
 }) {
+  const [, startTransition] = useTransition()
   const isCreator = currentPlayerId === creatorId
 
   return (
@@ -48,7 +50,7 @@ export function RoomLobby({
       {isCreator && (
         <div className="text-center">
           <button
-            onClick={onStart}
+            onClick={() => startTransition(() => onStart())}
             disabled={loading || players.length < 2}
             className="px-8 py-3 bg-green-600 text-white font-bold text-lg rounded-xl hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
           >

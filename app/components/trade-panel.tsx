@@ -1,5 +1,6 @@
 "use client"
 
+import { useTransition } from "react"
 import type { Trade, Player, Envelope } from "@/types"
 
 export function TradePanel({
@@ -17,6 +18,7 @@ export function TradePanel({
   onRespond: (tradeId: string, accept: boolean) => void
   onCancel: (tradeId: string) => void
 }) {
+  const [, startTransition] = useTransition()
   const pendingForMe = trades.filter(
     (t) => t.toPlayerId === currentPlayerId && t.status === "pending"
   )
@@ -67,13 +69,13 @@ export function TradePanel({
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
                 <button
-                  onClick={() => onRespond(trade.id, true)}
+                  onClick={() => startTransition(() => onRespond(trade.id, true))}
                   className="px-3 py-1 text-xs font-bold bg-green-500 text-white rounded-lg hover:bg-green-600"
                 >
                   Accept
                 </button>
                 <button
-                  onClick={() => onRespond(trade.id, false)}
+                  onClick={() => startTransition(() => onRespond(trade.id, false))}
                   className="px-3 py-1 text-xs font-bold bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
                   Decline
@@ -100,7 +102,7 @@ export function TradePanel({
                 {" to respond..."}
               </div>
               <button
-                onClick={() => onCancel(trade.id)}
+                onClick={() => startTransition(() => onCancel(trade.id))}
                 className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium shrink-0 ml-3"
               >
                 Cancel

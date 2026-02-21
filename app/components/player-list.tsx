@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import type { Envelope, Player, RoomStatus, Trade } from "@/types"
 
 export function PlayerList({
@@ -28,6 +28,7 @@ export function PlayerList({
     (t) => t.fromPlayerId === currentPlayerId && t.status === "pending"
   )
 
+  const [, startTransition] = useTransition()
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameInput, setRenameInput] = useState("")
 
@@ -42,7 +43,7 @@ export function PlayerList({
   function submitRename(playerId: string) {
     const trimmed = renameInput.trim()
     if (trimmed && onRenamePlayer) {
-      onRenamePlayer(playerId, trimmed)
+      startTransition(() => onRenamePlayer(playerId, trimmed))
     }
     setRenamingId(null)
   }
@@ -122,24 +123,10 @@ export function PlayerList({
                     <span className="ml-1 text-xs text-yellow-600">Host</span>
                   )}
                 </div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                {roomStatus === "picking" && (
-                  hasPicked && pickedEnvelope ? (
-                    <span className="flex items-center gap-1">
-                      <span className="text-xl leading-none">{pickedEnvelope.decoration}</span>
-                      <span className="text-xs font-mono text-red-400">{pickedEnvelope.code}</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                      Choosing...
-                    </span>
-                  )
-                )}
                 {canTrade && onOfferTrade && (
                   <button
-                    onClick={() => onOfferTrade(player.id)}
-                    className="text-xs px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium"
+                    onClick={() => startTransition(() => onOfferTrade(player.id))}
+                    className="text-xs px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium shrink-0"
                   >
                     Trade
                   </button>
@@ -154,13 +141,27 @@ export function PlayerList({
                       Rename
                     </button>
                     <button
-                      onClick={() => onRemovePlayer?.(player.id)}
+                      onClick={() => startTransition(() => onRemovePlayer?.(player.id))}
                       className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
                       title="Remove from room"
                     >
                       Remove
                     </button>
                   </>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {(roomStatus === "picking" || roomStatus === "trading") && (
+                  hasPicked && pickedEnvelope ? (
+                    <span className="flex items-center gap-1">
+                      <span className="text-xl leading-none">{pickedEnvelope.decoration}</span>
+                      <span className="text-xs font-mono text-red-400">{pickedEnvelope.code}</span>
+                    </span>
+                  ) : roomStatus === "picking" ? (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                      Choosing...
+                    </span>
+                  ) : null
                 )}
               </div>
             </div>
